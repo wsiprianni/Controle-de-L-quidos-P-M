@@ -1,0 +1,12 @@
+{
+  "name": "Controle de Gases — Operação P&M",
+  "short_name": "Controle Gases",
+  "description": "Controle de estoque, consumo, abastecimento e autonomia de gases.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#06101c",
+  "theme_color": "#07111f",
+  "lang": "pt-BR",
+  "orientation": "any"
+}
