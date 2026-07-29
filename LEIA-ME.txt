@@ -1,0 +1,46 @@
+# CONTROLE DE GASES — PRONTO PARA PUBLICAR
+
+O projeto já está conectado ao Firebase:
+controle-de-gases-c0d76
+
+## PASSO 1 — Firebase Authentication
+1. Abra o Firebase Console.
+2. Entre no projeto controle-de-gases-c0d76.
+3. Abra Authentication.
+4. Clique em Começar.
+5. Abra Método de login.
+6. Ative E-mail/senha.
+
+## PASSO 2 — Firestore
+1. Abra Firestore Database.
+2. Crie o banco de dados.
+3. Escolha uma região próxima.
+4. Abra a aba Regras.
+5. Copie o conteúdo do arquivo firestore.rules.
+6. Clique em Publicar.
+
+## PASSO 3 — GitHub
+1. Crie um repositório público chamado controle-de-gases.
+2. Extraia este ZIP.
+3. Envie TODOS os arquivos extraídos para a raiz do repositório.
+4. Não envie apenas o ZIP.
+
+## PASSO 4 — GitHub Pages
+1. Abra Settings.
+2. Abra Pages.
+3. Em Source, selecione Deploy from a branch.
+4. Escolha main.
+5. Escolha /(root).
+6. Clique em Save.
+
+O endereço ficará parecido com:
+https://SEU-USUARIO.github.io/controle-de-gases/
+
+## PRIMEIRO ACESSO
+1. Abra o endereço publicado.
+2. Clique em Criar conta.
+3. Use um e-mail e uma senha.
+4. Depois use o mesmo login em qualquer aparelho.
+
+## IMPORTANTE
+A chave pública do Firebase pode ficar no site. A proteção dos dados é feita pelas regras do Firestore e pelo login.

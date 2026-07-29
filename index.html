@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <title>Controle de Gases — Operação P&M</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#06101c;--panel:#0d1a2a;--panel2:#101f31;--line:#29405a;
+      --text:#fff;--muted:#9aaabd;--blue:#18c5ed;--green:#2ee38f;
+      --red:#ff5a70;--yellow:#ffc857;--input:#081421
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif}
+    button,input,select{font:inherit}
+    button{cursor:pointer}
+    .hidden{display:none!important}
+    header{position:sticky;top:0;z-index:20;background:rgba(6,16,28,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+    .head{max-width:1240px;margin:auto;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:14px}
+    h1,h2,h3,summary{color:#fff!important}
+    h1{font-size:clamp(19px,4vw,28px);margin:0}
+    .sub{color:var(--muted);font-size:12px;margin-top:4px}
+    .badge{border:1px solid var(--line);border-radius:999px;padding:7px 10px;color:#cfe4f3;font-size:12px}
+    main{max-width:1240px;margin:auto;padding:15px}
+    .panel,.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:18px}
+    .panel{padding:17px;margin-bottom:14px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+    .btn{border:0;border-radius:10px;padding:10px 13px;background:#087cf0;color:#fff;font-weight:800}
+    .btn.secondary{background:#14263a;border:1px solid #2c4664}
+    .btn.danger{background:#351621;color:#ff9aaa;border:1px solid #693042}
+    .btn.green{background:#087d53}
+    .btn.small{font-size:12px;padding:7px 9px}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:14px}
+    .card{padding:14px}
+    .card small{color:var(--muted);display:block}
+    .card strong{font-size:22px;display:block;margin-top:8px}
+    .form-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:end}
+    label{display:block;color:#b2c1d1;font-size:11px;font-weight:bold;margin-bottom:5px;text-transform:uppercase}
+    input,select{width:100%;background:var(--input);color:#fff;border:1px solid #29415c;border-radius:10px;padding:11px;outline:none}
+    input:focus,select:focus{border-color:var(--blue)}
+    .gas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .gas-card{padding:16px;border-left:5px solid var(--blue)}
+    .gas-top{display:flex;justify-content:space-between;gap:8px}
+    .gas-top h3{margin:0;font-size:20px}
+    .status{font-size:11px;padding:5px 8px;border-radius:999px;font-weight:bold}
+    .ok{color:#63e8b7;background:#0c3c31}.warn{color:#ffd477;background:#433716}.critical{color:#ff9bab;background:#461d29}
+    .tank-layout{display:grid;grid-template-columns:120px 1fr;gap:15px;align-items:center;margin-top:14px}
+    .tank{width:100px;height:195px;border:4px solid #73869d;border-radius:36px 36px 25px 25px;position:relative;overflow:hidden;background:#07121f;margin:auto}
+    .tank:before{content:"";position:absolute;top:-4px;left:30px;width:32px;height:17px;border:4px solid #73869d;border-bottom:0;border-radius:7px 7px 0 0;z-index:3}
+    .fill{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(#33d5f2,#0875d1);transition:.3s}
+    .fill.warn{background:linear-gradient(#ffd970,#c98705)}
+    .fill.critical{background:linear-gradient(#ff7184,#be203b)}
+    .pct{position:absolute;inset:0;display:grid;place-items:center;font-size:24px;font-weight:900;text-shadow:0 2px 5px #000;z-index:2}
+    .metrics{display:grid;gap:8px}
+    .metric{background:#081522;border:1px solid #213853;border-radius:10px;padding:10px}
+    .metric span{display:block;color:var(--muted);font-size:11px}
+    .metric b{display:block;margin-top:4px;font-size:14px}
+    .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}
+    .tabs{display:flex;gap:7px;overflow:auto;padding-bottom:7px;margin-bottom:10px}
+    .tab{flex:0 0 auto;border:1px solid #2d4764;background:#0b1928;color:#cfe0ee;border-radius:999px;padding:9px 13px;font-weight:bold}
+    .tab.active{background:#087cf0;color:white}
+    .chart-grid{display:grid;grid-template-columns:minmax(0,2.3fr) minmax(280px,1fr);gap:14px}
+    .chart-box{position:relative;height:430px;background:#091724;border:1px solid #29415b;border-radius:15px;padding:12px}
+    .projection{background:#0a1827;border:1px solid #29415b;border-radius:15px;padding:16px}
+    .projection h3{margin:0 0 7px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:10px;border-bottom:1px solid #23364b;text-align:left;white-space:nowrap}
+    th{color:#aebdcd}
+    .table-wrap{overflow:auto}
+    .alert-row{background:rgba(255,90,112,.12)}
+    .warning-row{background:rgba(255,200,87,.10)}
+    details summary{cursor:pointer;font-size:18px;font-weight:bold}
+    .history-panel{margin-top:13px}
+    .history-controls{display:grid;grid-template-columns:1fr auto;gap:9px;max-width:500px}
+    .history-results{margin-top:14px}
+    .history-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:13px}
+    dialog{border:1px solid var(--line);border-radius:16px;background:#0c1827;color:white;width:min(620px,calc(100% - 20px));padding:0}
+    dialog::backdrop{background:rgba(0,0,0,.72)}
+    .modal-head{padding:15px 17px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+    .modal-body{padding:17px}
+    .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}
+    .login{max-width:460px;margin:70px auto;padding:20px}
+    .cloud-note{color:#ffdc83;font-size:12px}
+    @media(max-width:950px){.gas-grid{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr 1fr}.chart-grid{grid-template-columns:1fr}}
+    @media(max-width:620px){.gas-grid,.modal-grid,.form-grid,.history-cards{grid-template-columns:1fr}.chart-box{height:340px}.head{align-items:flex-start}.tank-layout{grid-template-columns:108px 1fr}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="head">
+    <div>
+      <h1>CONTROLE DE GASES — OPERAÇÃO P&amp;M</h1>
+      <div class="sub">Estoque, consumo, abastecimento e projeção</div>
+    </div>
+    <span class="badge" id="modeBadge">Modo local</span>
+  </div>
+</header>
+
+<main>
+  <section id="authPanel" class="panel login hidden">
+    <h2>Acesso ao sistema</h2>
+    <p class="sub">Entre com seu e-mail para acessar os mesmos dados em vários dispositivos.</p>
+    <div style="display:grid;gap:10px">
+      <div><label>E-mail</label><input id="email" type="email"></div>
+      <div><label>Senha</label><input id="password" type="password"></div>
+      <button class="btn" id="loginBtn">Entrar</button>
+      <button class="btn secondary" id="registerBtn">Criar conta</button>
+      <p id="authMsg" class="cloud-note"></p>
+    </div>
+  </section>
+
+  <div id="app">
+    <section class="toolbar">
+      <button class="btn" id="addGasBtn">＋ Adicionar gás</button>
+      <button class="btn secondary" id="backupBtn">Backup</button>
+      <button class="btn secondary" id="restoreBtn">Restaurar</button>
+      <input id="restoreFile" class="hidden" type="file" accept=".json">
+      <button class="btn secondary" id="csvBtn">Excel/CSV</button>
+      <button class="btn danger hidden" id="logoutBtn">Sair</button>
+    </section>
+
+    <section class="stats">
+      <div class="card"><small>Gases cadastrados</small><strong id="stGases">0</strong></div>
+      <div class="card"><small>Consumo diário total</small><strong id="stDaily">0</strong></div>
+      <div class="card"><small>Alertas</small><strong id="stAlerts">0</strong></div>
+      <div class="card"><small>Última atualização</small><strong id="stUpdate" style="font-size:15px">—</strong></div>
+    </section>
+
+    <section class="panel">
+      <h2>Registrar leitura</h2>
+      <div class="form-grid">
+        <div><label>Gás</label><select id="readingGas"></select></div>
+        <div><label>Nível atual</label><input id="readingLevel" type="number" min="0" step="0.01"></div>
+        <div><label>Data</label><input id="readingDate" type="date"></div>
+        <div><label>Horário</label><input id="readingTime" type="time"></div>
+        <button class="btn" id="saveReadingBtn">Registrar leitura</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Projeção de autonomia</h2>
+      <div id="gasGrid" class="gas-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Consumo &amp; projeção</h2>
+      <div id="tabs" class="tabs"></div>
+      <div class="chart-grid">
+        <div class="chart-box"><canvas id="levelChart"></canvas></div>
+        <div class="projection">
+          <h3>Próximos 7 dias</h3>
+          <div id="projectionAverage" class="sub"></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Data</th><th>Consumo</th><th>Nível estimado</th></tr></thead>
+            <tbody id="projectionBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <details id="historyDetails">
+        <summary>Histórico diário e mensal</summary>
+        <div class="history-panel">
+          <div class="history-controls">
+            <input id="historyDate" type="date">
+            <button class="btn" id="searchHistoryBtn">Buscar valores</button>
+          </div>
+          <div id="historyResults" class="history-results"></div>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details open>
+        <summary>Registrar abastecimento</summary>
+        <div class="form-grid" style="margin-top:13px">
+          <div><label>Gás</label><select id="supplyGas"></select></div>
+          <div><label>Quantidade</label><input id="supplyQty" type="number" min="0" step="0.01"></div>
+          <div><label>Data</label><input id="supplyDate" type="date"></div>
+          <div><label>Nota fiscal</label><input id="supplyNf"></div>
+          <button class="btn green" id="saveSupplyBtn">Registrar abastecimento</button>
+        </div>
+      </details>
+    </section>
+  </div>
+</main>
+
+<dialog id="gasDialog">
+  <div class="modal-head"><h3 id="gasModalTitle">Adicionar gás</h3><button class="btn secondary small" id="closeGasBtn">Fechar</button></div>
+  <div class="modal-body">
+    <input id="gasId" type="hidden">
+    <div class="modal-grid">
+      <div><label>Nome</label><input id="gasName"></div>
+      <div><label>Sigla</label><input id="gasCode" placeholder="Ex.: O₂"></div>
+      <div><label>Local</label><input id="gasLocation"></div>
+      <div><label>Unidade</label><select id="gasUnit"><option>m³</option><option>kg</option><option>L</option><option>t</option><option>cilindros</option></select></div>
+      <div><label>Capacidade</label><input id="gasCapacity" type="number" min="0" step="0.01"></div>
+      <div><label>Nível atual</label><input id="gasLevel" type="number" min="0" step="0.01"></div>
+      <div><label>Nível crítico</label><input id="gasCritical" type="number" min="0" step="0.01"></div>
+      <div><label>Média diária inicial</label><input id="gasAvg" type="number" min="0" step="0.01"></div>
+    </div>
+    <div class="modal-actions"><button class="btn secondary" id="cancelGasBtn">Cancelar</button><button class="btn" id="saveGasBtn">Salvar gás</button></div>
+  </div>
+</dialog>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { firebaseConfig } from "./firebase-config.js";
+
+const LOCAL_KEY = "controle_gases_site_v8";
+const cloudEnabled = firebaseConfig && firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("COLE_AQUI");
+let fbApp=null, auth=null, firestore=null, user=null;
+if(cloudEnabled){
+  fbApp=initializeApp(firebaseConfig);
+  auth=getAuth(fbApp);
+  firestore=getFirestore(fbApp);
+}
+
+let db = loadLocal();
+let selectedGas = db.gases[0]?.id || null;
+let chart = null;
+
+const $ = id => document.getElementById(id);
+const uid = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2);
+const n = v => Number(v || 0);
+const fmt = (v,d=2) => n(v).toLocaleString("pt-BR",{maximumFractionDigits:d});
+const today = () => new Date().toISOString().slice(0,10);
+const nowTime = () => new Date().toTimeString().slice(0,5);
+const dateTime = (d,t="12:00") => new Date(`${d}T${t}:00`);
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+
+function emptyDb(){return {gases:[],readings:[],supplies:[],updated:null}}
+function loadLocal(){try{return JSON.parse(localStorage.getItem(LOCAL_KEY)) || emptyDb()}catch{return emptyDb()}}
+async function persist(){
+  db.updated=new Date().toISOString();
+  localStorage.setItem(LOCAL_KEY,JSON.stringify(db));
+  if(user && firestore) await setDoc(doc(firestore,"users",user.uid),db);
+  render();
+}
+async function loadCloud(){
+  const snap=await getDoc(doc(firestore,"users",user.uid));
+  if(snap.exists()) db=snap.data(); else await setDoc(doc(firestore,"users",user.uid),db);
+  selectedGas=db.gases[0]?.id||null;
+  localStorage.setItem(LOCAL_KEY,JSON.stringify(db));
+  render();
+}
+
+function readings(gid){return db.readings.filter(r=>r.gid===gid).sort((a,b)=>dateTime(a.date,a.time)-dateTime(b.date,b.time))}
+function supplies(gid){return db.supplies.filter(s=>s.gid===gid).sort((a,b)=>dateTime(a.date,a.time||"12:00")-dateTime(b.date,b.time||"12:00"))}
+function currentLevel(g){const r=readings(g.id);return r.length?n(r.at(-1).level):n(g.level)}
+function supplyAtReading(gid, reading, previous){
+  const explicit = supplies(gid).filter(s=>{
+    const ts=dateTime(s.date,s.time||"12:00");
+    return ts>dateTime(previous.date,previous.time) && ts<=dateTime(reading.date,reading.time);
+  });
+  return explicit.reduce((sum,s)=>sum+n(s.qty),0);
+}
+function detectedSupply(gid,index){
+  const r=readings(gid);
+  if(index<=0)return 0;
+  const rise=n(r[index].level)-n(r[index-1].level);
+  return rise>0?rise:0;
+}
+function consumptionStats(g){
+  const r=readings(g.id);
+  if(r.length<2)return {daily:n(g.avg),monthly:n(g.avg)*30};
+  let consumed=0,days=0;
+  for(let i=1;i<r.length;i++){
+    const elapsed=Math.max((dateTime(r[i].date,r[i].time)-dateTime(r[i-1].date,r[i-1].time))/86400000,1/24);
+    const supply=supplyAtReading(g.id,r[i],r[i-1]);
+    let usage=n(r[i-1].level)+supply-n(r[i].level);
+    if(supply===0 && n(r[i].level)>n(r[i-1].level)) usage=0;
+    if(usage>=0){consumed+=usage;days+=elapsed}
+  }
+  const daily=days?consumed/days:n(g.avg);
+  return {daily,monthly:daily*30};
+}
+function gasStatus(g){
+  const pct=n(g.capacity)?currentLevel(g)/n(g.capacity)*100:0;
+  if(pct<30)return ["Crítico","critical"];
+  if(pct<40)return ["Atenção","warn"];
+  return ["Normal","ok"];
+}
+
+function render(){
+  const options=db.gases.length?db.gases.map(g=>`<option value="${g.id}">${esc(g.code||g.name)} — ${esc(g.name)}</option>`).join(""):'<option value="">Adicione um gás</option>';
+  ["readingGas","supplyGas"].forEach(id=>{const old=$(id).value;$(id).innerHTML=options;if(db.gases.some(g=>g.id===old))$(id).value=old});
+  $("stGases").textContent=db.gases.length;
+  $("stDaily").textContent=fmt(db.gases.reduce((s,g)=>s+consumptionStats(g).daily,0));
+  $("stAlerts").textContent=db.gases.filter(g=>gasStatus(g)[1]!=="ok").length;
+  $("stUpdate").textContent=db.updated?new Date(db.updated).toLocaleString("pt-BR"):"—";
+  renderCards();renderTabs();renderChart();renderProjection();
+}
+function renderCards(){
+  $("gasGrid").innerHTML=db.gases.length?db.gases.map(g=>{
+    const lv=currentLevel(g),pct=n(g.capacity)?Math.max(0,Math.min(100,lv/n(g.capacity)*100)):0;
+    const st=consumptionStats(g),days=st.daily?lv/st.daily:Infinity,[label,cls]=gasStatus(g);
+    return `<article class="card gas-card">
+      <div class="gas-top"><div><h3>${esc(g.name)}</h3><span class="sub">${esc(g.code||"")} · ${esc(g.location||"Sem local")}</span></div><span class="status ${cls}">${label}</span></div>
+      <div class="tank-layout">
+        <div class="tank"><div class="fill ${cls}" style="height:${pct}%"></div><div class="pct">${fmt(pct,0)}%</div></div>
+        <div class="metrics">
+          <div class="metric"><span>Nível atual</span><b>${fmt(lv)} ${esc(g.unit)}</b></div>
+          <div class="metric"><span>Média diária</span><b>${fmt(st.daily)} ${esc(g.unit)}/dia</b></div>
+          <div class="metric"><span>Média mensal</span><b>${fmt(st.monthly)} ${esc(g.unit)}/mês</b></div>
+          <div class="metric"><span>Autonomia estimada</span><b>${Number.isFinite(days)?fmt(days,1)+" dias":"Sem média"}</b></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn small historyBtn" data-id="${g.id}">Ver histórico</button>
+        <button class="btn secondary small editBtn" data-id="${g.id}">Configurar</button>
+        <button class="btn danger small deleteBtn" data-id="${g.id}">Excluir</button>
+      </div>
+    </article>`;
+  }).join(""):'<div class="sub">Nenhum gás cadastrado.</div>';
+  document.querySelectorAll(".historyBtn").forEach(b=>b.addEventListener("click",()=>openHistory(b.dataset.id)));
+  document.querySelectorAll(".editBtn").forEach(b=>b.addEventListener("click",()=>editGas(b.dataset.id)));
+  document.querySelectorAll(".deleteBtn").forEach(b=>b.addEventListener("click",()=>deleteGas(b.dataset.id)));
+}
+function renderTabs(){
+  $("tabs").innerHTML=db.gases.map(g=>`<button class="tab ${selectedGas===g.id?"active":""}" data-id="${g.id}">${esc(g.code||g.name)}</button>`).join("");
+  document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{selectedGas=b.dataset.id;renderTabs();renderChart();renderProjection()}));
+}
+function renderChart(){
+  const g=db.gases.find(x=>x.id===selectedGas);
+  const r=g?readings(g.id):[];
+  if(chart)chart.destroy();
+  const labels=r.map(x=>`${new Date(x.date+"T12:00").toLocaleDateString("pt-BR")} ${x.time}`);
+  const levelData=r.map(x=>n(x.level));
+  const supplyData=r.map((x,i)=>detectedSupply(g.id,i)>0?n(x.level):null);
+  const critical=r.map(()=>n(g.critical));
+  chart=new Chart($("levelChart"),{
+    type:"line",
+    data:{
+      labels,
+      datasets:[
+        {label:`Nível ${g?.code||""}`,data:levelData,borderColor:"#18c5ed",backgroundColor:"#18c5ed",pointRadius:5,pointHoverRadius:8,tension:.28,spanGaps:true},
+        {label:"Nível crítico",data:critical,borderColor:"#ff5a70",borderDash:[8,7],pointRadius:0,tension:0},
+        {label:"Abastecimento",data:supplyData,borderColor:"#2ee38f",backgroundColor:"#2ee38f",showLine:false,pointRadius:11,pointHoverRadius:14,pointBorderWidth:3,pointBorderColor:"#d8ffef"}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,interaction:{mode:"nearest",intersect:true},
+      plugins:{
+        legend:{labels:{color:"#fff",font:{size:14}}},
+        tooltip:{
+          callbacks:{
+            title:items=>items[0]?.label||"",
+            label:ctx=>{
+              if(ctx.dataset.label==="Abastecimento"){
+                const qty=detectedSupply(g.id,ctx.dataIndex);
+                const rd=r[ctx.dataIndex];
+                const explicit=supplies(g.id).find(s=>s.date===rd.date);
+                return [`Abastecimento: ${fmt(qty)} ${g.unit}`,`Nível após abastecimento: ${fmt(rd.level)} ${g.unit}`,explicit?.nf?`Nota fiscal: ${explicit.nf}`:""];
+              }
+              return `${ctx.dataset.label}: ${fmt(ctx.raw)} ${g.unit}`;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{ticks:{color:"#9aabbd",maxRotation:0,autoSkip:true,maxTicksLimit:9},grid:{color:"#22384e"}},
+        y:{ticks:{color:"#9aabbd"},grid:{color:"#22384e"}}
+      }
+    },
+    plugins:[{
+      id:"supplyLabels",
+      afterDatasetsDraw(c){
+        const meta=c.getDatasetMeta(2),ctx=c.ctx;
+        ctx.save();ctx.fillStyle="#2ee38f";ctx.font="bold 12px Arial";ctx.textAlign="center";
+        meta.data.forEach((pt,i)=>{if(supplyData[i]!==null)ctx.fillText("Abastecimento",pt.x,pt.y-18)});
+        ctx.restore();
+      }
+    }]
+  });
+}
+function renderProjection(){
+  const g=db.gases.find(x=>x.id===selectedGas);
+  if(!g){$("projectionBody").innerHTML="";return}
+  const avg=consumptionStats(g).daily,lv=currentLevel(g);
+  $("projectionAverage").textContent=`Média diária: ${fmt(avg)} ${g.unit}/dia`;
+  let rows="";
+  for(let i=1;i<=7;i++){
+    const d=new Date();d.setDate(d.getDate()+i);
+    const est=Math.max(0,lv-avg*i),pct=n(g.capacity)?est/n(g.capacity)*100:100;
+    rows+=`<tr class="${pct<30?"alert-row":pct<40?"warning-row":""}"><td>${d.toLocaleDateString("pt-BR")}</td><td>${fmt(avg)} ${g.unit}</td><td>${fmt(est)} ${g.unit}</td></tr>`;
+  }
+  $("projectionBody").innerHTML=rows;
+}
+function openHistory(gid){
+  selectedGas=gid;
+  $("historyDetails").open=true;
+  $("historyDate").value=today();
+  searchHistory();
+  $("historyDetails").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function searchHistory(){
+  const g=db.gases.find(x=>x.id===selectedGas),date=$("historyDate").value;
+  if(!g||!date){$("historyResults").innerHTML='<p class="sub">Escolha um gás e uma data.</p>';return}
+  const dayReadings=readings(g.id).filter(r=>r.date===date);
+  const daySupplies=supplies(g.id).filter(s=>s.date===date);
+  const month=date.slice(0,7);
+  const monthReadings=readings(g.id).filter(r=>r.date.startsWith(month));
+  let dayConsumption=0;
+  for(let i=1;i<dayReadings.length;i++){
+    const diff=n(dayReadings[i-1].level)-n(dayReadings[i].level);
+    if(diff>0)dayConsumption+=diff;
+  }
+  let monthConsumption=0;
+  for(let i=1;i<monthReadings.length;i++){
+    const diff=n(monthReadings[i-1].level)-n(monthReadings[i].level);
+    if(diff>0)monthConsumption+=diff;
+  }
+  const rows=dayReadings.map((r,i)=>{
+    const supply=detectedSupply(g.id,readings(g.id).findIndex(x=>x.id===r.id));
+    return `<tr><td>${r.time}</td><td>${fmt(r.level)} ${g.unit}</td><td>${supply>0?fmt(supply)+" "+g.unit:"—"}</td></tr>`;
+  }).join("");
+  $("historyResults").innerHTML=`
+    <div class="history-cards">
+      <div class="card"><small>Consumo do dia</small><strong>${fmt(dayConsumption)} ${g.unit}</strong></div>
+      <div class="card"><small>Consumo do mês</small><strong>${fmt(monthConsumption)} ${g.unit}</strong></div>
+      <div class="card"><small>Leituras no dia</small><strong>${dayReadings.length}</strong></div>
+      <div class="card"><small>Abastecimentos no dia</small><strong>${daySupplies.length}</strong></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Horário</th><th>Nível</th><th>Abastecimento detectado</th></tr></thead><tbody>${rows||'<tr><td colspan="3">Sem registros nesta data.</td></tr>'}</tbody></table></div>`;
+}
+function editGas(id){
+  const g=db.gases.find(x=>x.id===id);
+  $("gasId").value=g.id;$("gasName").value=g.name;$("gasCode").value=g.code||"";$("gasLocation").value=g.location||"";
+  $("gasUnit").value=g.unit;$("gasCapacity").value=g.capacity;$("gasLevel").value=currentLevel(g);$("gasCritical").value=g.critical;$("gasAvg").value=g.avg||0;
+  $("gasModalTitle").textContent="Configurar gás";$("gasDialog").showModal();
+}
+async function deleteGas(id){
+  if(!confirm("Excluir este gás e todo o histórico?"))return;
+  db.gases=db.gases.filter(g=>g.id!==id);db.readings=db.readings.filter(r=>r.gid!==id);db.supplies=db.supplies.filter(s=>s.gid!==id);
+  selectedGas=db.gases[0]?.id||null;await persist();
+}
+$("addGasBtn").addEventListener("click",()=>{
+  ["gasId","gasName","gasCode","gasLocation","gasCapacity","gasLevel","gasCritical","gasAvg"].forEach(id=>$(id).value="");
+  $("gasModalTitle").textContent="Adicionar gás";$("gasDialog").showModal();
+});
+$("closeGasBtn").addEventListener("click",()=>$("gasDialog").close());
+$("cancelGasBtn").addEventListener("click",()=>$("gasDialog").close());
+$("saveGasBtn").addEventListener("click",async()=>{
+  if(!$("gasName").value.trim())return alert("Informe o nome do gás.");
+  const obj={id:$("gasId").value||uid(),name:$("gasName").value.trim(),code:$("gasCode").value.trim(),location:$("gasLocation").value.trim(),unit:$("gasUnit").value,capacity:n($("gasCapacity").value),level:n($("gasLevel").value),critical:n($("gasCritical").value),avg:n($("gasAvg").value)};
+  const i=db.gases.findIndex(g=>g.id===obj.id);
+  if(i>=0)db.gases[i]=obj;else db.gases.push(obj);
+  if(!readings(obj.id).length && obj.level>0)db.readings.push({id:uid(),gid:obj.id,level:obj.level,date:today(),time:nowTime()});
+  selectedGas=obj.id;$("gasDialog").close();await persist();
+});
+$("saveReadingBtn").addEventListener("click",async()=>{
+  const gid=$("readingGas").value,level=$("readingLevel").value;
+  if(!gid||level==="")return alert("Preencha gás e nível.");
+  db.readings.push({id:uid(),gid,level:n(level),date:$("readingDate").value,time:$("readingTime").value});
+  selectedGas=gid;$("readingLevel").value="";await persist();
+});
+$("saveSupplyBtn").addEventListener("click",async()=>{
+  const gid=$("supplyGas").value,qty=n($("supplyQty").value);
+  if(!gid||qty<=0)return alert("Preencha gás e quantidade.");
+  const g=db.gases.find(x=>x.id===gid),newLevel=currentLevel(g)+qty;
+  db.supplies.push({id:uid(),gid,qty,date:$("supplyDate").value,time:nowTime(),nf:$("supplyNf").value.trim()});
+  db.readings.push({id:uid(),gid,level:newLevel,date:$("supplyDate").value,time:nowTime()});
+  selectedGas=gid;$("supplyQty").value="";$("supplyNf").value="";await persist();
+});
+$("searchHistoryBtn").addEventListener("click",searchHistory);
+$("backupBtn").addEventListener("click",()=>download(JSON.stringify(db,null,2),"backup_controle_gases.json","application/json"));
+$("restoreBtn").addEventListener("click",()=>$("restoreFile").click());
+$("restoreFile").addEventListener("change",e=>{
+  const file=e.target.files[0];if(!file)return;const reader=new FileReader();
+  reader.onload=async()=>{try{db=JSON.parse(reader.result);selectedGas=db.gases[0]?.id||null;await persist()}catch{alert("Backup inválido.")}};
+  reader.readAsText(file);
+});
+$("csvBtn").addEventListener("click",()=>{
+  const rows=[["Tipo","Data","Hora","Gás","Sigla","Quantidade","Unidade","NF"]];
+  db.readings.forEach(r=>{const g=db.gases.find(x=>x.id===r.gid);rows.push(["Leitura",r.date,r.time,g?.name||"",g?.code||"",r.level,g?.unit||"",""])});
+  db.supplies.forEach(s=>{const g=db.gases.find(x=>x.id===s.gid);rows.push(["Abastecimento",s.date,s.time||"",g?.name||"",g?.code||"",s.qty,g?.unit||"",s.nf||""])});
+  download("\uFEFF"+rows.map(row=>row.map(v=>`"${String(v).replaceAll('"','""')}"`).join(";")).join("\n"),"controle_gases.csv","text/csv;charset=utf-8");
+});
+function download(content,name,type){const b=new Blob([content],{type}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;a.click()}
+$("readingDate").value=today();$("readingTime").value=nowTime();$("supplyDate").value=today();$("historyDate").value=today();
+
+if(cloudEnabled){
+  $("modeBadge").textContent="Nuvem ativa";
+  $("authPanel").classList.remove("hidden");$("app").classList.add("hidden");
+  onAuthStateChanged(auth,async u=>{
+    user=u;
+    if(u){$("authPanel").classList.add("hidden");$("app").classList.remove("hidden");$("logoutBtn").classList.remove("hidden");await loadCloud()}
+    else{$("authPanel").classList.remove("hidden");$("app").classList.add("hidden")}
+  });
+  $("loginBtn").addEventListener("click",async()=>{try{await signInWithEmailAndPassword(auth,$("email").value,$("password").value)}catch(e){$("authMsg").textContent=e.message}});
+  $("registerBtn").addEventListener("click",async()=>{try{await createUserWithEmailAndPassword(auth,$("email").value,$("password").value)}catch(e){$("authMsg").textContent=e.message}});
+  $("logoutBtn").addEventListener("click",()=>signOut(auth));
+}else{
+  $("modeBadge").textContent="Modo local — configure Firebase";
+  $("authPanel").classList.add("hidden");$("app").classList.remove("hidden");
+  render();
+}
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(console.error);
+  });
+}
+</script>
+
+</body>
+</html>
